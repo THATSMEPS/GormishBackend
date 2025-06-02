@@ -4,7 +4,7 @@ const { successResponse, errorResponse } = require('../utils/responseHandler');
 
 const register = async (req, res) => {
   try {
-    const { email, password, name, role = 'customer' } = req.body;
+    const { email, password, name, phone = '' } = req.body;
 
     // Check if user already exists
     const existingUser = await prisma.customer.findUnique({
@@ -25,17 +25,14 @@ const register = async (req, res) => {
       return errorResponse(res, authError.message, 400);
     }
 
-    // Create user profile based on role
-    let user;
-    if (role === 'customer') {
-      user = await prisma.customer.create({
-        data: {
-          email,
-          name,
-          phone: req.body.phone || '',
-        }
-      });
-    }
+    // Create customer profile
+    const user = await prisma.customer.create({
+      data: {
+        email,
+        name,
+        phone
+      }
+    });
 
     return successResponse(res, {
       user,

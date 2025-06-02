@@ -5,6 +5,8 @@ const dotenv = require('dotenv');
 // Load environment variables
 dotenv.config();
 
+const PORT = process.env.PORT || 3000;
+
 // Import routes
 const authRoutes = require('./routes/auth');
 const menuRoutes = require('./routes/menu');
@@ -13,6 +15,7 @@ const restaurantRoutes = require('./routes/restaurants');
 const areaRoutes = require('./routes/areas');
 const deliveryPartnerRoutes = require('./routes/delivery-partners');
 const reviewRoutes = require('./routes/reviews');
+const customerRoutes = require('./routes/customers');
 
 const app = express();
 
@@ -26,6 +29,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'success',
     message: 'API is running',
+    environment,
     timestamp: new Date()
   });
 });
@@ -38,6 +42,7 @@ app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/areas', areaRoutes);
 app.use('/api/delivery-partners', deliveryPartnerRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/customers', customerRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -47,12 +52,60 @@ app.use((err, req, res, next) => {
     message: 'Internal Server Error',
     error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
+  err.status = err.status || 'error';
+
+  if (environment === 'development') {
+    if (err.name === 'ValidationError') err = handleValidationError(err);
+    if (err.code === 11000) err = handleDuplicateFieldsDB(err);
+    if (err.name === 'CastError') err = handleCastError(err);
+
+    res.status(err.statusCode).json({
+      success: false,
+      error: err,
+      message: err.message,
+      stack: err.stack
+    });
+  } else {
+    // Production
+    if (err.isOperational) {
+      res.status(err.statusCode).json({
+        success: false,
+        message: err.message
+      });
+    } else {
+      console.error('ERROR 💥', err);
+      res.status(500).json({
+        success: false,
+        message: 'Something went wrong!'
+      });
+    }
+  }
 });
 
-const PORT = process.env.PORT || 3000;
+// Handle unhandled routes
+app.all('*', (req, res, next) => {
+  next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
+});
 
-app.listen(PORT, () => {
+// Start server
+const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err) => {
+  console.log('UNHANDLED REJECTION! 💥 Shutting down...');
+  console.error(err);
+  server.close(() => {
+    process.exit(1);
+  });
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.log('UNCAUGHT EXCEPTION! 💥 Shutting down...');
+  console.error(err);
+  process.exit(1);
 });
 
 module.exports = app;

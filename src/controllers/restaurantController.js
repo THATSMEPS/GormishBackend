@@ -49,12 +49,15 @@ const getRestaurantById = async (req, res) => {
   }
 };
 
+const supabase = require('../config/supabase');
+
 const createRestaurant = async (req, res) => {
   try {
     const {
       name,
       mobile,
       email,
+      password, // Add password field for Supabase auth
       cuisines,
       vegNonveg,
       hours,
@@ -62,23 +65,32 @@ const createRestaurant = async (req, res) => {
       address,
       banners,
       applicableTaxBracket
-    } = req.body;
-
-    const existingRestaurant = await prisma.restaurant.findFirst({
-      where: {
-        OR: [
-          { mobile },
-          { email }
-        ]
+    } = req.body;    // First register with Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: 'http://localhost:3000',
+        data: {
+          type: 'restaurant',
+          name,
+          role: 'restaurant_owner'
+        }
       }
     });
 
-    if (existingRestaurant) {
-      return errorResponse(res, 'Restaurant with this mobile or email already exists', 400);
+    if (authError) {
+      console.error('Supabase Auth Error:', authError);
+      return errorResponse(res, authError.message, 400);
+    }
+
+    if (!authData.user) {
+      return errorResponse(res, 'Failed to create restaurant account', 400);
     }
 
     const restaurant = await prisma.restaurant.create({
       data: {
+        id: authData.user.id, // Use Supabase user ID
         name,
         mobile,
         email,

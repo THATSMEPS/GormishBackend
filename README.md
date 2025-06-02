@@ -36,21 +36,24 @@ A robust backend system for a food delivery application built with Node.js, Expr
 
 ### Authentication
 
+This API uses separate registration flows for customers and restaurants, but a shared login system.
+
+#### Customer Registration & Auth
+
 #### `POST /api/auth/register`
-Register a new user (customer/restaurant/delivery partner)
+Register a new customer
 - Body:
   ```json
   {
-    "email": "user@example.com",
+    "email": "customer@example.com",
     "password": "password",
-    "name": "User Name",
-    "phone": "+911234567890",
-    "role": "customer" // Optional, defaults to customer
+    "name": "Customer Name",
+    "phone": "+911234567890"
   }
   ```
 
 #### `POST /api/auth/login`
-Login with email and password
+Login with email and password (Used by both customers and restaurants)
 - Body:
   ```json
   {
@@ -58,6 +61,7 @@ Login with email and password
     "password": "password"
   }
   ```
+- Note: This endpoint is shared between customers and restaurants. The system will automatically detect the user type based on the email.
 
 #### `POST /api/auth/google`
 Sign in with Google
@@ -113,6 +117,13 @@ Update area
 
 ### Restaurants
 
+#### Restaurant Registration & Management
+
+#### `POST /api/restaurants`
+Register a new restaurant (Restaurant Registration Endpoint)
+- Headers: Authorization Bearer Token required
+- Description: This endpoint is used to register a new restaurant in the system. After registration, restaurant owners can use `/api/auth/login` with their email and password to access their account.
+
 #### `GET /api/restaurants`
 Get all restaurants
 
@@ -121,10 +132,6 @@ Get restaurants in a specific area
 
 #### `GET /api/restaurants/:id`
 Get restaurant by ID
-
-#### `POST /api/restaurants`
-Create new restaurant
-- Headers: Authorization Bearer Token required
 - Body:
   ```json
   {
@@ -322,14 +329,23 @@ Update review
 Delete review
 - Headers: Authorization Bearer Token required
 
-## Authentication
+## Authentication Flow
 
-The API uses JWT-based authentication. For protected endpoints:
-1. Get the access token from login/register response
-2. Add it to the request header:
-   ```
-   Authorization: Bearer your-access-token
-   ```
+### Customer Registration Flow
+1. Customer registers using `/api/auth/register`
+2. Customer logs in using `/api/auth/login`
+3. Customer uses the received token for authenticated requests
+
+### Restaurant Registration Flow
+1. Restaurant registers using `/api/restaurants` (POST)
+2. Restaurant logs in using `/api/auth/login`
+3. Restaurant uses the received token for authenticated requests
+
+### Token Usage
+For protected endpoints, add the access token from login response to request header:
+```
+Authorization: Bearer your-access-token
+```
 
 ## Error Responses
 
