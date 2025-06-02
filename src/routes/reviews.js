@@ -12,9 +12,13 @@ const reviewValidation = [
 ];
 
 // Routes
-router.get('/', authenticateToken, reviewController.getReviews);
-router.post('/', authenticateToken, reviewValidation, validate, reviewController.createReview);
-router.put('/:id', authenticateToken, body('reviewText').trim().notEmpty(), validate, reviewController.updateReview);
-router.delete('/:id', authenticateToken, reviewController.deleteReview);
+// router.get('/', authenticateToken, reviewController.getReviews);
+router.get('/', reviewController.getReviews);
+// router.post('/', authenticateToken, reviewValidation, validate, reviewController.createReview);
+router.post('/', reviewValidation, validate, reviewController.createReview);
+// router.put('/:id', authenticateToken, body('reviewText').trim().notEmpty(), validate, reviewController.updateReview);
+router.put('/:id', body('reviewText').trim().notEmpty(), validate, reviewController.updateReview);
+// router.delete('/:id', authenticateToken, reviewController.deleteReview);
+router.delete('/:id', reviewController.deleteReview);
 
 module.exports = router;

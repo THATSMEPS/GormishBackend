@@ -23,8 +23,8 @@ router.get('/', restaurantController.getAllRestaurants);
 router.get('/area/:areaId', restaurantController.getRestaurantsByArea);
 router.get('/:id', restaurantController.getRestaurantById);
 router.post('/', restaurantValidation, validate, restaurantController.createRestaurant);
-router.put('/:id', authenticateToken, restaurantValidation, validate, restaurantController.updateRestaurant);
-router.patch('/:id/approval', authenticateToken, body('approval').isBoolean(), validate, restaurantController.updateApprovalStatus);
-router.delete('/:id', authenticateToken, restaurantController.deleteRestaurant);
+router.put('/:id', restaurantValidation, validate, restaurantController.updateRestaurant);
+router.patch('/:id/approval', body('approval').isBoolean(), validate, restaurantController.updateApprovalStatus);
+router.delete('/:id', restaurantController.deleteRestaurant);
 
 module.exports = router;

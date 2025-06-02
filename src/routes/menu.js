@@ -17,9 +17,12 @@ const menuItemValidation = [
 
 // Routes
 router.get('/restaurant/:restaurantId', menuController.getMenuByRestaurantId);
-router.post('/', authenticateToken, menuItemValidation, validate, menuController.createMenuItem);
-router.put('/:id', authenticateToken, menuItemValidation, validate, menuController.updateMenuItem);
-router.delete('/:id', authenticateToken, menuController.deleteMenuItem);
+// router.post('/', authenticateToken, menuItemValidation, validate, menuController.createMenuItem);
+router.post('/', menuItemValidation, validate, menuController.createMenuItem);
+// router.put('/:id', authenticateToken, menuItemValidation, validate, menuController.updateMenuItem);
+router.put('/:id', menuItemValidation, validate, menuController.updateMenuItem);
+// router.delete('/:id', authenticateToken, menuController.deleteMenuItem);
+router.delete('/:id', menuController.deleteMenuItem);
 router.get('/:id', menuController.getMenuItemById);
 
 module.exports = router;

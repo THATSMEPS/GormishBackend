@@ -25,10 +25,14 @@ const statusValidation = [
 ];
 
 // Routes
-router.get('/', authenticateToken, deliveryPartnerController.getDeliveryPartners);
-router.get('/:id', authenticateToken, deliveryPartnerController.getDeliveryPartnerById);
+// router.get('/', authenticateToken, deliveryPartnerController.getDeliveryPartners);
+router.get('/', deliveryPartnerController.getDeliveryPartners);
+// router.get('/:id', authenticateToken, deliveryPartnerController.getDeliveryPartnerById);
+router.get('/:id', deliveryPartnerController.getDeliveryPartnerById);
 router.post('/', dpValidation, validate, deliveryPartnerController.createDeliveryPartner);
-router.patch('/:id/status', authenticateToken, statusValidation, validate, deliveryPartnerController.updateDeliveryPartnerStatus);
-router.patch('/:id/location', authenticateToken, locationValidation, validate, deliveryPartnerController.updateLiveLocation);
+// router.patch('/:id/status', authenticateToken, statusValidation, validate, deliveryPartnerController.updateDeliveryPartnerStatus);
+router.patch('/:id/status', statusValidation, validate, deliveryPartnerController.updateDeliveryPartnerStatus);
+// router.patch('/:id/location', authenticateToken, locationValidation, validate, deliveryPartnerController.updateLiveLocation);
+router.patch('/:id/location', locationValidation, validate, deliveryPartnerController.updateLiveLocation);
 
 module.exports = router;
