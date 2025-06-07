@@ -42,7 +42,7 @@ model Restaurant {
   reviews              OrderReview[]
   orders               Order[]
   area                 AreaTable     @relation(fields: [areaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
+  isOpen               Boolean       @default(false) @map("r_is_open")
   @@map("restaurants")
 }
 

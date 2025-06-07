@@ -28,6 +28,22 @@ router.post('/login', loginValidation, validate, authController.login);
 router.post('/logout', authenticateToken, authController.logout);
 router.get('/me', authenticateToken, authController.getCurrentUser);
 
+router.post('/send-verification-email',
+  body('email').isEmail().normalizeEmail(),
+  validate,
+  authController.sendVerificationEmail
+);
+
+router.post('/verify-otp',
+  body('email').isEmail().normalizeEmail(),
+  body('otp').isLength({ min: 6, max: 6 }),
+  validate,
+  authController.verifyOtp
+);
+
+// Deprecated route for token verification
+router.get('/verify-email', authController.verifyEmail);
+
 // Placeholder for Google auth and refresh token (remove if not implemented)
 router.post('/google', 
   body('access_token').notEmpty(),

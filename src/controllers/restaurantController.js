@@ -10,6 +10,37 @@ const config = require('../config/environment');
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
+
+const updateRestaurantOpenStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isOpen } = req.body;
+
+    if (typeof isOpen !== 'boolean') {
+      return errorResponse(res, 'Invalid isOpen value', 400);
+    }
+
+    // Ensure the authenticated user owns the restaurant
+    if (id !== req.user.id) {
+      return errorResponse(res, 'Unauthorized to update this restaurant', 403);
+    }
+
+    const restaurant = await prisma.restaurant.findUnique({ where: { id } });
+    if (!restaurant) {
+      return errorResponse(res, 'Restaurant not found', 404);
+    }
+
+    const updatedRestaurant = await prisma.restaurant.update({
+      where: { id },
+      data: { isOpen }
+    });
+
+    return successResponse(res, updatedRestaurant, 'Restaurant open status updated successfully');
+  } catch (error) {
+    return errorResponse(res, 'Error updating restaurant open status', 500, error);
+  }
+};
+
 const getAllRestaurants = async (req, res) => {
   try {
     const restaurants = await prisma.restaurant.findMany({
@@ -321,6 +352,22 @@ const updateRestaurant = async (req, res) => {
       }
     }
 
+    // Remove open/close logic from hours to prevent clash with centralized toggle
+    // Assuming hours is a JSON object, remove any open/close flags if present
+    let sanitizedHours = restaurant.hours;
+    if (hours) {
+      sanitizedHours = JSON.parse(JSON.stringify(hours));
+      // Example: delete open/close flags if they exist
+      for (const day in sanitizedHours) {
+        if (sanitizedHours[day].hasOwnProperty('open')) {
+          delete sanitizedHours[day].open;
+        }
+        if (sanitizedHours[day].hasOwnProperty('close')) {
+          delete sanitizedHours[day].close;
+        }
+      }
+    }
+
     const updatedRestaurant = await prisma.restaurant.update({
       where: { id },
       data: {
@@ -329,7 +376,7 @@ const updateRestaurant = async (req, res) => {
         email: email || restaurant.email,
         cuisines: cuisines || restaurant.cuisines,
         vegNonveg: vegNonveg || restaurant.vegNonveg,
-        hours: hours ? JSON.parse(JSON.stringify(hours)) : restaurant.hours,
+        hours: sanitizedHours,
         address: address ? JSON.parse(JSON.stringify(address)) : restaurant.address,
         banners: banners || restaurant.banners,
         applicableTaxBracket: applicableTaxBracket ? parseFloat(applicableTaxBracket) : restaurant.applicableTaxBracket
@@ -404,5 +451,7 @@ module.exports = {
   updateRestaurant,
   updateApprovalStatus,
   deleteRestaurant,
-  upload
+  uploadBanner,
+  upload,
+  updateRestaurantOpenStatus
 };

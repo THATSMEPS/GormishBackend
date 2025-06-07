@@ -35,4 +35,6 @@ router.put('/:id', authenticateToken, restaurantValidation, validate, restaurant
 router.patch('/:id/approval', authenticateToken, body('approval').isBoolean(), validate, restaurantController.updateApprovalStatus);
 router.delete('/:id', authenticateToken, restaurantController.deleteRestaurant);
 
+router.put('/:id/openstatus', authenticateToken, restaurantController.updateRestaurantOpenStatus);
+
 module.exports = router;
