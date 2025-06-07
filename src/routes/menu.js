@@ -15,14 +15,20 @@ const menuItemValidation = [
   body('isVeg').optional().isBoolean()
 ];
 
+// Validation middleware for update (exclude restaurantId)
+const menuItemUpdateValidation = [
+  body('name').trim().notEmpty(),
+  body('price').isFloat({ min: 0 }),
+  body('cuisine').trim().notEmpty(),
+  body('packagingCharges').isFloat({ min: 0 }),
+  body('isVeg').optional().isBoolean()
+];
+
 // Routes
 router.get('/restaurant/:restaurantId', menuController.getMenuByRestaurantId);
-// router.post('/', authenticateToken, menuItemValidation, validate, menuController.createMenuItem);
-router.post('/', menuItemValidation, validate, menuController.createMenuItem);
-// router.put('/:id', authenticateToken, menuItemValidation, validate, menuController.updateMenuItem);
-router.put('/:id', menuItemValidation, validate, menuController.updateMenuItem);
-// router.delete('/:id', authenticateToken, menuController.deleteMenuItem);
-router.delete('/:id', menuController.deleteMenuItem);
+router.post('/', authenticateToken, menuItemValidation, validate, menuController.createMenuItem);
+router.put('/:id', authenticateToken, menuItemUpdateValidation, validate, menuController.updateMenuItem);
+router.delete('/:id', authenticateToken, menuController.deleteMenuItem);
 router.get('/:id', menuController.getMenuItemById);
 
 module.exports = router;

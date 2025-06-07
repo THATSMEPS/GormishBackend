@@ -27,6 +27,7 @@ model Restaurant {
   createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
   mobile               String        @unique @map("r_mobile") @db.VarChar
   email                String        @unique @map("r_email") @db.VarChar
+  password             String        @map("r_password") @db.VarChar
   approval             Boolean       @default(false) @map("r_approval")
   cuisines             String        @map("r_cuisines") @db.VarChar
   vegNonveg            String        @map("r_veg_nonveg") @db.VarChar
@@ -53,6 +54,7 @@ model MenuItem {
   isVeg            Boolean?    @default(true) @map("item_is_veg")
   packagingCharges Decimal     @map("item_packaging_charges") @db.Decimal(10, 2)
   cuisine          String      @map("item_cuisine") @db.VarChar
+  isAvailable      Boolean     @default(true) @map("is_available")
   createdAt        DateTime    @default(now()) @map("item_created_at") @db.Timestamp(6)
   updatedAt        DateTime    @default(now()) @updatedAt @map("item_updated_at") @db.Timestamp(6)
   addons           Json?       @map("item_addons") @db.Json
@@ -116,12 +118,15 @@ model Order {
   restaurantId      String              @map("r_id") @db.Uuid
   deliveryPartnerId String?             @map("dp_id") @db.Uuid
   customerId        String              @map("c_id") @db.Uuid
+  address           Json?               @map("c_address") @db.Json
   id                String              @id @default(dbgenerated("gen_random_uuid()")) @map("order_id") @db.Uuid
   items             OrderItem[]
   review            OrderReview[]
   customer          Customer            @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   deliveryPartner   DeliveryPartner?    @relation(fields: [deliveryPartnerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   restaurant        Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+             
+             
 
   @@map("orders")
 }
@@ -184,6 +189,7 @@ enum gender_enum {
 }
 
 enum order_status_enum {
+  pending
   preparing
   ready
   dispatch

@@ -11,11 +11,13 @@ const createOrderValidation = [
   body('items').isArray().notEmpty(),
   body('items.*.menuItemId').notEmpty(),
   body('items.*.quantity').isInt({ min: 1 }),
-  body('paymentType').isIn(['COD', 'ONLINE'])
+  body('paymentType').isIn(['COD', 'ONLINE']),
+  body('address').optional().isObject()
 ];
 
 const updateStatusValidation = [
   body('status').isIn([
+    'pending',
     'preparing',
     'ready',
     'dispatch',
@@ -42,9 +44,11 @@ router.get('/customer/:customerId', orderController.getCustomerOrders);
 // Restaurant orders
 // router.get('/restaurant/:restaurantId', authenticateToken, orderController.getRestaurantOrders);
 router.get('/restaurant/:restaurantId', orderController.getRestaurantOrders);
+router.get('/restaurant/:restaurantId/history', authenticateToken, orderController.getRestaurantOrderHistory);
+
 
 // Delivery partner orders
 // router.get('/delivery-partner/:dpId', authenticateToken, orderController.getDeliveryPartnerOrders);
-router.get('/delivery-partner/:dpId', orderController.getDeliveryPartnerOrders);
+// router.get('/delivery-partner/:dpId', orderController.getDeliveryPartnerOrders);
 
 module.exports = router;

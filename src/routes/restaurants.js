@@ -17,14 +17,22 @@ const restaurantValidation = [
   body('address').notEmpty().withMessage('Address is required'),
   body('hours').notEmpty().withMessage('Operating hours are required')
 ];
+const loginValidation = [
+  body('email').isEmail().normalizeEmail(),
+  body('password').notEmpty()
+];
 
 // Routes
+
 router.get('/', restaurantController.getAllRestaurants);
 router.get('/area/:areaId', restaurantController.getRestaurantsByArea);
+router.get('/me', authenticateToken, restaurantController.getCurrentRestaurant);
 router.get('/:id', restaurantController.getRestaurantById);
 router.post('/', restaurantValidation, validate, restaurantController.createRestaurant);
-router.put('/:id', restaurantValidation, validate, restaurantController.updateRestaurant);
-router.patch('/:id/approval', body('approval').isBoolean(), validate, restaurantController.updateApprovalStatus);
-router.delete('/:id', restaurantController.deleteRestaurant);
+router.post('/login', loginValidation, validate, restaurantController.loginRestaurant);
+router.post('/logout', authenticateToken, restaurantController.logoutRestaurant);
+router.put('/:id', authenticateToken, restaurantValidation, validate, restaurantController.updateRestaurant);
+router.patch('/:id/approval', authenticateToken, body('approval').isBoolean(), validate, restaurantController.updateApprovalStatus);
+router.delete('/:id', authenticateToken, restaurantController.deleteRestaurant);
 
 module.exports = router;

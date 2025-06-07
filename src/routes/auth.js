@@ -3,6 +3,7 @@ const { body } = require('express-validator');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const validate = require('../middleware/validation');
+const { authenticateToken, tokenBlacklist } = require('../middleware/auth');
 
 // Validation middleware
 const registerValidation = [
@@ -24,21 +25,20 @@ const refreshTokenValidation = [
 // Routes
 router.post('/register', registerValidation, validate, authController.register);
 router.post('/login', loginValidation, validate, authController.login);
-router.post('/logout', authController.logout);
-router.get('/me', authController.getCurrentUser);
+router.post('/logout', authenticateToken, authController.logout);
+router.get('/me', authenticateToken, authController.getCurrentUser);
 
-// Google auth route
+// Placeholder for Google auth and refresh token (remove if not implemented)
 router.post('/google', 
   body('access_token').notEmpty(),
   validate,
-  authController.googleSignIn
+  (req, res) => res.status(501).json({ message: 'Google auth not implemented' })
 );
 
-// Refresh token route
 router.post('/refresh-token',
   refreshTokenValidation,
   validate,
-  authController.refreshToken
+  (req, res) => res.status(501).json({ message: 'Refresh token not implemented' })
 );
 
 module.exports = router;
