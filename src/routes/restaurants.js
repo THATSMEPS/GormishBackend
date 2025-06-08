@@ -33,7 +33,7 @@ router.get('/:id', restaurantController.getRestaurantById);
 router.post('/', restaurantValidation, validate, restaurantController.createRestaurant);
 router.post('/login', loginValidation, validate, restaurantController.loginRestaurant);
 router.post('/logout', authenticateToken, restaurantController.logoutRestaurant);
-router.put('/:id', authenticateToken, restaurantValidation, validate, restaurantController.updateRestaurant);
+router.patch('/:id', authenticateToken, restaurantValidation, validate, restaurantController.updateRestaurant);
 router.patch('/:id/approval', authenticateToken, body('approval').isBoolean(), validate, restaurantController.updateApprovalStatus);
 router.delete('/:id', authenticateToken, restaurantController.deleteRestaurant);
 
