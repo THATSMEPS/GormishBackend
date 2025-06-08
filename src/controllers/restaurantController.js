@@ -304,7 +304,13 @@ const getCurrentRestaurant = async (req, res) => {
       return errorResponse(res, 'Restaurant not found', 404);
     }
 
-    return successResponse(res, restaurant, 'Restaurant retrieved successfully');
+    // Explicitly include serving_radius in the response if needed
+    const responseRestaurant = {
+      ...restaurant,
+      serving_radius: restaurant.serving_radius
+    };
+
+    return successResponse(res, responseRestaurant, 'Restaurant retrieved successfully');
   } catch (error) {
     return errorResponse(res, 'Error retrieving restaurant', 500, error);
   }

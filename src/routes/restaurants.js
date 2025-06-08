@@ -4,6 +4,8 @@ const router = express.Router();
 const restaurantController = require('../controllers/restaurantController');
 const { authenticateToken } = require('../middleware/auth');
 const validate = require('../middleware/validation');
+const multer = require('multer');
+const upload = multer();
 
 // Validation middleware
 const restaurantValidation = [
@@ -36,5 +38,7 @@ router.patch('/:id/approval', authenticateToken, body('approval').isBoolean(), v
 router.delete('/:id', authenticateToken, restaurantController.deleteRestaurant);
 
 router.put('/:id/openstatus', authenticateToken, restaurantController.updateRestaurantOpenStatus);
+
+router.patch('/:id/banner', authenticateToken, upload.single('file'), restaurantController.uploadBanner);
 
 module.exports = router;
