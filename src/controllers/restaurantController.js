@@ -5,11 +5,37 @@ const multer = require('multer');
 const supabase = require('../config/supabase');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
 const config = require('../config/environment');
+const fetch = require('node-fetch');  // Add node-fetch for server-side HTTP requests
 
 // Multer setup for handling multipart/form-data with multiple files
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
+const reverseGeocode = async (req, res) => {
+  try {
+    const { lat, lon } = req.query;
+    if (!lat || !lon) {
+      return errorResponse(res, 'Latitude and longitude query parameters are required', 400);
+    }
+
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'GormishBackend/1.0 (lekorof656@3dboxer.com)' // Replace with your contact info
+      }
+    });
+
+    if (!response.ok) {
+      return errorResponse(res, `Error from reverse geocoding service: ${response.statusText}`, response.status);
+    }
+
+    const data = await response.json();
+    return successResponse(res, data, 'Reverse geocoding successful');
+  } catch (error) {
+    return errorResponse(res, 'Error while reverse geocoding coordinates', 500, error);
+  }
+};
 
 const updateRestaurantOpenStatus = async (req, res) => {
   try {
@@ -55,15 +81,14 @@ const getAllRestaurants = async (req, res) => {
 };
 
 // New uploadBanner method to handle banner image upload and update
-const uploadBanner = async (req, res) => {
+const uploadBannerSignup = async (req, res) => {
   try {
     if (!req.file) {
       return errorResponse(res, 'No file uploaded', 400);
     }
 
-    const restaurantId = req.user.id;
     const file = req.file;
-    const folderName = `${restaurantId}`;
+    const folderName = `signup-banners`;
     const fileName = `${folderName}/${Date.now()}-${file.originalname}`;
 
     // Upload file buffer to Supabase bucket 'banners'
@@ -77,7 +102,7 @@ const uploadBanner = async (req, res) => {
 
     if (error) {
       console.error('Supabase upload error:', error);
-      return errorResponse(res, 'Error uploading banner image', 500, error);
+      return errorResponse(res, `Error uploading banner image: ${error.message || JSON.stringify(error)}`, 500);
     }
 
     // Get public URL of uploaded banner
@@ -85,28 +110,11 @@ const uploadBanner = async (req, res) => {
       .from('banners')
       .getPublicUrl(fileName);
 
-    // Fetch current restaurant banners
-    const restaurant = await prisma.restaurant.findUnique({
-      where: { id: restaurantId }
-    });
-
-    if (!restaurant) {
-      return errorResponse(res, 'Restaurant not found', 404);
-    }
-
-    // Replace old banners with new banner URL
-    const updatedBanners = [publicUrl];
-
-    // Update restaurant banners in database
-    const updatedRestaurant = await prisma.restaurant.update({
-      where: { id: restaurantId },
-      data: { banners: updatedBanners }
-    });
-
-    return successResponse(res, updatedRestaurant, 'Banner updated successfully');
+    // Return the public URL of the uploaded banner image
+    return successResponse(res, { publicUrl }, 'Banner uploaded successfully');
   } catch (error) {
-    console.error('Error in uploadBanner:', error);
-    return errorResponse(res, 'Error updating banner', 500, error);
+    console.error('Error in uploadBannerSignup:', error);
+    return errorResponse(res, `Error uploading banner: ${error.message || error}`, 500);
   }
 };
 
@@ -140,12 +148,17 @@ const getRestaurantById = async (req, res) => {
       return errorResponse(res, 'Restaurant not found', 404);
     }
 
-    return successResponse(res, restaurant, 'Restaurant retrieved successfully');
+    // Explicitly include banners in the response
+    const responseRestaurant = {
+      ...restaurant,
+      banners: restaurant.banners
+    };
+
+    return successResponse(res, responseRestaurant, 'Restaurant retrieved successfully');
   } catch (error) {
     return errorResponse(res, 'Error retrieving restaurant', 500, error);
   }
 };
-
 
 const createRestaurant = async (req, res) => {
   try {
@@ -158,6 +171,7 @@ const createRestaurant = async (req, res) => {
       cuisines,
       vegNonveg,
       hours,
+      serving_radius,
       areaId,
       address,
       applicableTaxBracket
@@ -222,7 +236,8 @@ const createRestaurant = async (req, res) => {
         address: address ? JSON.parse(JSON.stringify(address)) : {},
         banners,
         applicableTaxBracket: applicableTaxBracket ? parseFloat(applicableTaxBracket) : null,
-        areaId
+        areaId,
+        serving_radius: serving_radius ? parseInt(serving_radius) : 0
       }
     });
 
@@ -304,10 +319,13 @@ const getCurrentRestaurant = async (req, res) => {
       return errorResponse(res, 'Restaurant not found', 404);
     }
 
-    // Explicitly include serving_radius in the response if needed
+    // Explicitly include serving_radius, hours, isOpen, and banners in the response
     const responseRestaurant = {
       ...restaurant,
-      serving_radius: restaurant.serving_radius
+      serving_radius: restaurant.serving_radius,
+      hours: restaurant.hours,
+      isOpen: restaurant.isOpen,
+      banners: restaurant.banners
     };
 
     return successResponse(res, responseRestaurant, 'Restaurant retrieved successfully');
@@ -358,20 +376,10 @@ const updateRestaurant = async (req, res) => {
       }
     }
 
-    // Remove open/close logic from hours to prevent clash with centralized toggle
-    // Assuming hours is a JSON object, remove any open/close flags if present
-    let sanitizedHours = restaurant.hours;
+    // Preserve open/close times in hours JSON without removing them
+    let updatedHours = restaurant.hours;
     if (hours) {
-      sanitizedHours = JSON.parse(JSON.stringify(hours));
-      // Example: delete open/close flags if they exist
-      for (const day in sanitizedHours) {
-        if (sanitizedHours[day].hasOwnProperty('open')) {
-          delete sanitizedHours[day].open;
-        }
-        if (sanitizedHours[day].hasOwnProperty('close')) {
-          delete sanitizedHours[day].close;
-        }
-      }
+      updatedHours = JSON.parse(JSON.stringify(hours));
     }
 
     const updatedRestaurant = await prisma.restaurant.update({
@@ -382,7 +390,7 @@ const updateRestaurant = async (req, res) => {
         email: email || restaurant.email,
         cuisines: cuisines || restaurant.cuisines,
         vegNonveg: vegNonveg || restaurant.vegNonveg,
-        hours: sanitizedHours,
+        hours: updatedHours,
         address: address ? JSON.parse(JSON.stringify(address)) : restaurant.address,
         banners: banners || restaurant.banners,
         applicableTaxBracket: applicableTaxBracket ? parseFloat(applicableTaxBracket) : restaurant.applicableTaxBracket
@@ -446,6 +454,61 @@ const deleteRestaurant = async (req, res) => {
   }
 };
 
+const uploadBanner = async (req, res) => {
+  try {
+    if (!req.file) {
+      return errorResponse(res, 'No file uploaded', 400);
+    }
+
+    const restaurantId = req.user.id;
+    const file = req.file;
+    const folderName = `${restaurantId}`;
+    const fileName = `${folderName}/${Date.now()}-${file.originalname}`;
+
+    // Upload file buffer to Supabase bucket 'banners'
+    const { data, error } = await supabase.storage
+      .from('banners')
+      .upload(fileName, file.buffer, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: file.mimetype
+      });
+
+    if (error) {
+      console.error('Supabase upload error:', error);
+      return errorResponse(res, 'Error uploading banner image', 500, error);
+    }
+
+    // Get public URL of uploaded banner
+    const { data: { publicUrl } } = supabase.storage
+      .from('banners')
+      .getPublicUrl(fileName);
+
+    // Fetch current restaurant banners
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { id: restaurantId }
+    });
+
+    if (!restaurant) {
+      return errorResponse(res, 'Restaurant not found', 404);
+    }
+
+    // Replace old banners with new banner URL
+    const updatedBanners = [publicUrl];
+
+    // Update restaurant banners in database
+    const updatedRestaurant = await prisma.restaurant.update({
+      where: { id: restaurantId },
+      data: { banners: updatedBanners }
+    });
+
+    return successResponse(res, updatedRestaurant, 'Banner updated successfully');
+  } catch (error) {
+    console.error('Error in uploadBanner:', error);
+    return errorResponse(res, 'Error updating banner', 500, error);
+  }
+};
+
 module.exports = {
   getAllRestaurants,
   getRestaurantsByArea,
@@ -459,5 +522,7 @@ module.exports = {
   deleteRestaurant,
   uploadBanner,
   upload,
-  updateRestaurantOpenStatus
+  updateRestaurantOpenStatus,
+  uploadBannerSignup,
+  reverseGeocode
 };

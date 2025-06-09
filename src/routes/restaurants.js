@@ -25,7 +25,7 @@ const loginValidation = [
 ];
 
 // Routes
-
+router.get('/reverse-geocode', restaurantController.reverseGeocode);
 router.get('/', restaurantController.getAllRestaurants);
 router.get('/area/:areaId', restaurantController.getRestaurantsByArea);
 router.get('/me', authenticateToken, restaurantController.getCurrentRestaurant);
@@ -39,6 +39,11 @@ router.delete('/:id', authenticateToken, restaurantController.deleteRestaurant);
 
 router.put('/:id/openstatus', authenticateToken, restaurantController.updateRestaurantOpenStatus);
 
+// router.patch('/:id/banner', authenticateToken, upload.single('file'), restaurantController.uploadBanner);
 router.patch('/:id/banner', authenticateToken, upload.single('file'), restaurantController.uploadBanner);
+
+router.post('/signup/banner', upload.single('file'), restaurantController.uploadBannerSignup);
+
+
 
 module.exports = router;
