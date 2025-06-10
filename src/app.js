@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const http = require('http');
+const { Server } = require('socket.io');
 
 // Load environment variables
 dotenv.config();
@@ -19,8 +21,12 @@ const customerRoutes = require('./routes/customers');
 
 const app = express();
 
-// Middleware
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PATCH', 'OPTIONS', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -87,8 +93,21 @@ app.all('*', (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
 
+// Create HTTP server and attach socket.io
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST', 'PATCH', 'DELETE']
+  }
+});
+
+// Attach io instance to app for global access
+app.set('io', io);
+
 // Start server
-const server = app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 

@@ -14,9 +14,13 @@ const customerUpdateValidation = [
 ];
 
 // Routes
-router.get('/', authenticateToken, customerController.getCustomers);
-router.get('/:id', authenticateToken, customerController.getCustomerById);
-router.put('/:id', authenticateToken, customerUpdateValidation, validate, customerController.updateCustomer);
-router.delete('/:id', authenticateToken, customerController.deleteCustomer);
+// router.get('/', authenticateToken, customerController.getCustomers);
+router.get('/', customerController.getCustomers);
+// router.get('/:id', authenticateToken, customerController.getCustomerById);
+router.get('/:id', customerController.getCustomerById);
+// router.put('/:id', authenticateToken, customerUpdateValidation, validate, customerController.updateCustomer);
+router.put('/:id', customerUpdateValidation, validate, customerController.updateCustomer);
+// router.delete('/:id', authenticateToken, customerController.deleteCustomer);
+router.delete('/:id', customerController.deleteCustomer);
 
 module.exports = router;

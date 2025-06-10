@@ -4,11 +4,13 @@ const { successResponse, errorResponse } = require('../utils/responseHandler');
 const createOrder = async (req, res) => {
   try {
     const { 
-      restaurantId, 
+      restaurantId,
+      customerId, 
       items, 
       paymentType,
       customerNotes,
-      distance 
+      distance,
+      address
     } = req.body;
 
     // Calculate items amount and GST
@@ -46,23 +48,39 @@ const createOrder = async (req, res) => {
     const order = await prisma.order.create({
       data: {
         restaurantId,
-        customerId: req.user.id,
-        status: 'preparing',
+        customerId: customerId,
+        status: 'pending',
         paymentType,
         customerNotes,
         distance,
+        address,
         itemsAmount,
         gst,
         deliveryFee,
         totalAmount,
         items: {
           create: orderItems
-        }
+        },
+        orderType
       },
       include: {
         items: true
       }
     });
+
+    // Emit socket.io event for order update
+    const fullOrder = await prisma.order.findUnique({
+      where: { id: order.id },
+      include: {
+        items: { include: { menuItem: true } },
+        restaurant: true,
+        customer: true,
+        deliveryPartner: true
+      }
+    });
+
+    const io = req.app.get('io');
+    io.emit('order:new', fullOrder);
 
     return successResponse(res, order, 'Order created successfully', 201);
   } catch (error) {
@@ -73,6 +91,9 @@ const createOrder = async (req, res) => {
 const getOrders = async (req, res) => {
   try {
     const orders = await prisma.order.findMany({
+      where: {
+        status: { in: ['pending', 'preparing', 'ready'] } // Filter active orders
+      },
       include: {
         items: {
           include: {
@@ -83,6 +104,7 @@ const getOrders = async (req, res) => {
         customer: true,
         deliveryPartner: true
       }
+      
     });
 
     return successResponse(res, orders, 'Orders retrieved successfully');
@@ -124,11 +146,14 @@ const updateOrderStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
+    console.log(`Received status update request for order ${id} with status: ${status}`);
+
     const order = await prisma.order.findUnique({
       where: { id }
     });
 
     if (!order) {
+      console.log(`Order with id ${id} not found`);
       return errorResponse(res, 'Order not found', 404);
     }
 
@@ -137,8 +162,25 @@ const updateOrderStatus = async (req, res) => {
       data: { status }
     });
 
+    console.log(`Order ${id} status updated to: ${updatedOrder.status}`);
+
+    // Emit socket.io event for order update
+    const fullOrder = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        items: { include: { menuItem: true } },
+        restaurant: true,
+        customer: true,
+        deliveryPartner: true
+      }
+    });
+
+    const io = req.app.get('io');
+    io.emit('order:update', fullOrder);
+
     return successResponse(res, updatedOrder, 'Order status updated successfully');
   } catch (error) {
+    console.error('Error updating order status:', error);
     return errorResponse(res, 'Error updating order status', 500, error);
   }
 };
@@ -165,6 +207,7 @@ const getCustomerOrders = async (req, res) => {
 
     return successResponse(res, orders, 'Customer orders retrieved successfully');
   } catch (error) {
+    console.error('Error retrieving customer orders:', error);
     return errorResponse(res, 'Error retrieving customer orders', 500, error);
   }
 };
@@ -174,7 +217,10 @@ const getRestaurantOrders = async (req, res) => {
     const { restaurantId } = req.params;
 
     const orders = await prisma.order.findMany({
-      where: { restaurantId },
+      where: {
+        restaurantId,
+        status: { in: ['pending', 'preparing', 'ready'] } // Filter active orders
+      },
       include: {
         items: {
           include: {
@@ -191,38 +237,38 @@ const getRestaurantOrders = async (req, res) => {
 
     return successResponse(res, orders, 'Restaurant orders retrieved successfully');
   } catch (error) {
+    console.error('Error retrieving restaurant orders:', error);
     return errorResponse(res, 'Error retrieving restaurant orders', 500, error);
   }
 };
-
-const getDeliveryPartnerOrders = async (req, res) => {
+const getRestaurantOrderHistory = async (req, res) => {
   try {
-    const { dpId } = req.params;
+    const { restaurantId } = req.params;
+    const { page = 1, limit = 20 } = req.query;
+
+    
+    if (restaurantId !== req.user.id) {
+      return errorResponse(res, 'Unauthorized: You do not have access to this restaurant', 403);
+    }
 
     const orders = await prisma.order.findMany({
-      where: { 
-        deliveryPartnerId: dpId,
-        status: {
-          in: ['dispatch', 'delivered']
-        }
+      where: {
+        restaurantId,
+        status: { in: ['dispatch', 'rejected'] } // History orders
       },
       include: {
-        items: {
-          include: {
-            menuItem: true
-          }
-        },
-        restaurant: true,
-        customer: true
+        items: { include: { menuItem: true } },
+        customer: true,
+        deliveryPartner: true
       },
-      orderBy: {
-        placedAt: 'desc'
-      }
+      orderBy: { placedAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: parseInt(limit)
     });
 
-    return successResponse(res, orders, 'Delivery partner orders retrieved successfully');
+    return successResponse(res, orders, 'Restaurant order history retrieved successfully');
   } catch (error) {
-    return errorResponse(res, 'Error retrieving delivery partner orders', 500, error);
+    return errorResponse(res, 'Error retrieving restaurant order history', 500, error);
   }
 };
 
@@ -233,5 +279,5 @@ module.exports = {
   updateOrderStatus,
   getCustomerOrders,
   getRestaurantOrders,
-  getDeliveryPartnerOrders
+  getRestaurantOrderHistory
 };

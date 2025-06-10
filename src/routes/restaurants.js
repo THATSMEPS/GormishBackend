@@ -4,6 +4,8 @@ const router = express.Router();
 const restaurantController = require('../controllers/restaurantController');
 const { authenticateToken } = require('../middleware/auth');
 const validate = require('../middleware/validation');
+const multer = require('multer');
+const upload = multer();
 
 // Validation middleware
 const restaurantValidation = [
@@ -17,14 +19,31 @@ const restaurantValidation = [
   body('address').notEmpty().withMessage('Address is required'),
   body('hours').notEmpty().withMessage('Operating hours are required')
 ];
+const loginValidation = [
+  body('email').isEmail().normalizeEmail(),
+  body('password').notEmpty()
+];
 
 // Routes
+router.get('/reverse-geocode', restaurantController.reverseGeocode);
 router.get('/', restaurantController.getAllRestaurants);
 router.get('/area/:areaId', restaurantController.getRestaurantsByArea);
+router.get('/me', authenticateToken, restaurantController.getCurrentRestaurant);
 router.get('/:id', restaurantController.getRestaurantById);
 router.post('/', restaurantValidation, validate, restaurantController.createRestaurant);
-router.put('/:id', authenticateToken, restaurantValidation, validate, restaurantController.updateRestaurant);
+router.post('/login', loginValidation, validate, restaurantController.loginRestaurant);
+router.post('/logout', authenticateToken, restaurantController.logoutRestaurant);
+router.patch('/:id', authenticateToken, restaurantValidation, validate, restaurantController.updateRestaurant);
 router.patch('/:id/approval', authenticateToken, body('approval').isBoolean(), validate, restaurantController.updateApprovalStatus);
 router.delete('/:id', authenticateToken, restaurantController.deleteRestaurant);
+
+router.put('/:id/openstatus', authenticateToken, restaurantController.updateRestaurantOpenStatus);
+
+// router.patch('/:id/banner', authenticateToken, upload.single('file'), restaurantController.uploadBanner);
+router.patch('/:id/banner', authenticateToken, upload.single('file'), restaurantController.uploadBanner);
+
+router.post('/signup/banner', upload.single('file'), restaurantController.uploadBannerSignup);
+
+
 
 module.exports = router;

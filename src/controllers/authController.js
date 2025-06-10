@@ -1,6 +1,10 @@
 const supabase = require('../config/supabase');
 const prisma = require('../config/prisma');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
+const tokenStore = require('../utils/tokenStore');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
+const config = require('../config/environment');
 
 const register = async (req, res) => {
   try {
@@ -40,6 +44,136 @@ const register = async (req, res) => {
     }, 'Registration successful', 201);
   } catch (error) {
     return errorResponse(res, 'Error during registration', 500, error);
+  }
+};
+
+
+const generateOtp = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+const otpStore = new Map(); // Simple in-memory store for OTPs, consider persistent store for production
+
+const sendVerificationEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return errorResponse(res, 'Email is required', 400);
+    }
+
+    // Check if user already exists
+    const existingUser = await prisma.customer.findUnique({
+      where: { email }
+    });
+    if (existingUser) {
+      return errorResponse(res, 'Email is already verified and registered', 400);
+    }
+
+    // Generate OTP
+    const otp = generateOtp();
+
+    // Store OTP with expiration (e.g., 10 minutes)
+    otpStore.set(email, { otp, expiresAt: Date.now() + 10 * 60 * 1000 });
+
+    // Send email using nodemailer
+    const transporter = nodemailer.createTransport({
+      host: config.smtpHost,
+      port: config.smtpPort,
+      secure: config.smtpSecure, // true for 465, false for other ports
+      auth: {
+        user: config.smtpUser,
+        pass: config.smtpPass
+      }
+    });
+
+    const mailOptions = {
+      from: config.smtpFrom,
+      to: email,
+      subject: 'Your Email Verification Code',
+      html: `<p>Your verification code is: <strong>${otp}</strong></p>
+             <p>This code will expire in 10 minutes.</p>`
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return successResponse(res, null, 'Verification email sent with OTP');
+  } catch (error) {
+    console.error('Error sending verification email:', error);
+    return errorResponse(res, 'Error sending verification email', 500, error);
+  }
+};
+
+const verifyOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return errorResponse(res, 'Email and OTP are required', 400);
+    }
+
+    const record = otpStore.get(email);
+    if (!record) {
+      return errorResponse(res, 'OTP not found or expired', 400);
+    }
+
+    if (record.expiresAt < Date.now()) {
+      otpStore.delete(email);
+      return errorResponse(res, 'OTP expired', 400);
+    }
+
+    if (record.otp !== otp) {
+      return errorResponse(res, 'Invalid OTP', 400);
+    }
+
+    // OTP is valid, remove it
+    otpStore.delete(email);
+
+    // Check if user already exists (email verified)
+    const existingUser = await prisma.customer.findUnique({
+      where: { email }
+    });
+    if (existingUser) {
+      return errorResponse(res, 'Email is already verified', 400);
+    }
+
+    // Mark email as verified by allowing registration (frontend flow)
+    // Here we just return success
+    return successResponse(res, null, 'Email verified successfully');
+  } catch (error) {
+    return errorResponse(res, 'Error verifying OTP', 500, error);
+  }
+};
+
+const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token) {
+      return errorResponse(res, 'Verification token is required', 400);
+    }
+
+    // Validate token
+    const validation = tokenStore.validateToken(token);
+    if (!validation.valid) {
+      return errorResponse(res, validation.reason, 400);
+    }
+
+    const email = validation.email;
+
+    // Check if user already exists (email verified)
+    const existingUser = await prisma.customer.findUnique({
+      where: { email }
+    });
+    if (existingUser) {
+      tokenStore.invalidateToken(token);
+      return errorResponse(res, 'Email is already verified', 400);
+    }
+
+    // Mark email as verified by allowing registration (frontend flow)
+    // Here we just invalidate the token and return success
+    tokenStore.invalidateToken(token);
+
+    return successResponse(res, null, 'Email verified successfully');
+  } catch (error) {
+    return errorResponse(res, 'Error verifying email', 500, error);
   }
 };
 
@@ -190,11 +324,15 @@ const refreshToken = async (req, res) => {
   }
 };
 
+
 module.exports = {
   register,
+  sendVerificationEmail,
+  verifyEmail,
   login,
   logout,
   getCurrentUser,
   googleSignIn,
-  refreshToken
+  refreshToken,
+  verifyOtp
 };

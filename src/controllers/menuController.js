@@ -29,9 +29,23 @@ const createMenuItem = async (req, res) => {
       packagingCharges,
       cuisine,
       restaurantId,
-      addons
+      addons,
+      isAvailable
     } = req.body;
-    let imageUrl = null;
+    
+
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { id: restaurantId }
+    });
+
+    if (!restaurant) {
+      return errorResponse(res, 'Restaurant not found', 404);
+    }
+
+    if (restaurant.id !== req.user.id) {
+      return errorResponse(res, 'Unauthorized to create menu item for this restaurant', 403);
+    }
+
 
     // Handle image upload if file is provided
     if (req.file) {
@@ -46,7 +60,7 @@ const createMenuItem = async (req, res) => {
         .from('menu-items')
         .getPublicUrl(`${restaurantId}/${fileName}`);
       
-      imageUrl = publicUrl;
+      
     }
 
     const menuItem = await prisma.menuItem.create({
@@ -58,9 +72,9 @@ const createMenuItem = async (req, res) => {
         isVeg: isVeg === undefined ? true : isVeg,
         packagingCharges: parseFloat(packagingCharges),
         cuisine,
-        imageUrl,
         restaurantId,
-        addons: addons ? JSON.parse(JSON.stringify(addons)) : null
+        addons: addons ? JSON.parse(JSON.stringify(addons)) : null,
+        isAvailable: isAvailable === undefined ? true : isAvailable
       }
     });
 
@@ -81,10 +95,12 @@ const updateMenuItem = async (req, res) => {
       isVeg,
       packagingCharges,
       cuisine,
-      addons
+      addons,
+      isAvailable
     } = req.body;
-    let imageUrl = updateData.imageUrl;
+    
 
+    
     // Handle image upload if new file is provided
     if (req.file) {
       const fileName = `${Date.now()}-${req.file.originalname}`;
@@ -98,7 +114,7 @@ const updateMenuItem = async (req, res) => {
         .from('menu-items')
         .getPublicUrl(`${updateData.restaurantId}/${fileName}`);
       
-      imageUrl = publicUrl;
+      
     }
 
     const existingItem = await prisma.menuItem.findUnique({
@@ -108,6 +124,13 @@ const updateMenuItem = async (req, res) => {
     if (!existingItem) {
       return errorResponse(res, 'Menu item not found', 404);
     }
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { id: existingItem.restaurantId }
+    });
+    if (!restaurant || restaurant.id !== req.user.id) {
+      return errorResponse(res, 'Unauthorized to update this menu item', 403);
+    }
+
 
     const updatedItem = await prisma.menuItem.update({
       where: { id },
@@ -119,7 +142,8 @@ const updateMenuItem = async (req, res) => {
         isVeg: isVeg === undefined ? existingItem.isVeg : isVeg,
         packagingCharges: parseFloat(packagingCharges),
         cuisine,
-        addons: addons ? JSON.parse(JSON.stringify(addons)) : existingItem.addons
+        addons: addons ? JSON.parse(JSON.stringify(addons)) : existingItem.addons,
+        isAvailable: isAvailable === undefined ? existingItem.isAvailable : isAvailable
       }
     });
 
@@ -140,16 +164,16 @@ const deleteMenuItem = async (req, res) => {
     if (!existingItem) {
       return errorResponse(res, 'Menu item not found', 404);
     }
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { id: existingItem.restaurantId }
+    });
+
+    if (!restaurant || restaurant.id !== req.user.id) {
+      return errorResponse(res, 'Unauthorized to delete this menu item', 403);
+    }
 
     // Delete image from storage if it exists
-    if (existingItem.imageUrl) {
-      const imagePath = existingItem.imageUrl.split('/').slice(-2).join('/');
-      const { error } = await supabase.storage
-        .from('menu-items')
-        .remove([imagePath]);
-
-      if (error) throw error;
-    }
+    
 
     await prisma.menuItem.delete({
       where: { id }
